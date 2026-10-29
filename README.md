@@ -43,7 +43,7 @@ Untuk merakit stasiun solder uap ini, Anda membutuhkan komponen berikut:
 | **Encoder DT** | `D4` | Input Pullup |
 | **Encoder CLK** | `D5` | Input Pullup |
 | **MAX6675 CS** | `D10` | Chip Select |
-| **MAX6675 SO** | `D11` | MISO / Data Out |
+| **MAX6675 SO** | `D12` | MISO / Data Out |
 | **MAX6675 SCK**| `D13` | Serial Clock |
 | **Zero Cross** | `D2` | Interrupt Pin (Deteksi fase AC) |
 | **LCD 16x2** | `SDA / SCL` | Alamat default `0x27` (I2C) |

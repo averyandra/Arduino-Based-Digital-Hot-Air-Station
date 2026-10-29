@@ -85,8 +85,8 @@ void refreshLCD() {
 
   switch (uiState) {
     case UI_BOOT:
-      lcdPrintPadded(0, 0, "system loading");
-      lcdPrintPadded(0, 1, "");
+      lcdPrintPadded(0, 0, "Shinonome-VORSA");
+      lcdPrintPadded(0, 1, "system loading..");
       break;
     case UI_FAULT:
       lcdPrintPadded(0, 0, "MALFUNCTION!!");
