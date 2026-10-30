@@ -167,7 +167,7 @@ void loop() {
     if (lcdNeedsRefresh) {
       refreshLCD();
       lcdNeedsRefresh = false;
-    } else if (uiState == UI_RUN && backlightOn) {
+    } else if (uiState == UI_RUN /* && backlightOn */ ) { // comment the backlightOn logic for always refresh when backlight is off
       refreshLCD();
     }
   }
