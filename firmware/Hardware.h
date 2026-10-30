@@ -12,5 +12,6 @@ bool handleIsOnHolder();
 bool readTemperature();
 void updateEncoder();
 void updateButton();
+int getFreeRam(); // Fungsi deteksi sisa RAM
 
 #endif

@@ -1,5 +1,5 @@
 #include "Hardware.h"
-#include "UI.h"
+#include "UI.h" 
 #include <avr/interrupt.h>
 
 // --- LOCAL HARDWARE VARIABLES ---
@@ -24,9 +24,17 @@ static bool buttonStable = HIGH;
 static bool buttonLastRead = HIGH;
 static bool buttonPressedEvent = false;
 
+// --- UTILITY: FREE RAM CHECKER ---
+int getFreeRam() {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
 // --- INTERRUPT SERVICE ROUTINES (ISR) ---
+// CATATAN: TIDAK BOHLEH ADA Serial.print DI DALAM ISR!
 void zeroCrossISR() {
-  PORTD &= ~_BV(PD7);
+  PORTD &= ~_BV(PD7); 
   zcTicks = 0;
   gateTicksRemaining = 0;
   triacFiredThisHalfCycle = false;
@@ -48,12 +56,11 @@ ISR(TIMER2_COMPA_vect) {
   if (zcTicks < 100) zcTicks++;
   if (!triacFiredThisHalfCycle && zcTicks >= triacDelayTicks) {
     PORTD |= _BV(PD7);
-    gateTicksRemaining = 1; // Gate pulse duration
+    gateTicksRemaining = 1;
     triacFiredThisHalfCycle = true;
   }
 }
 
-// --- MAIN HARDWARE FUNCTIONS ---
 void hardwareInit() {
   pinMode(BUZZER_PIN, OUTPUT); digitalWrite(BUZZER_PIN, LOW);
   pinMode(TRIAC_PIN, OUTPUT); digitalWrite(TRIAC_PIN, LOW);
@@ -61,7 +68,7 @@ void hardwareInit() {
 
   pinMode(MAX_CS, OUTPUT); digitalWrite(MAX_CS, HIGH);
   pinMode(MAX_SCK, OUTPUT); digitalWrite(MAX_SCK, LOW);
-  pinMode(MAX_SO, INPUT_PULLUP);
+  pinMode(MAX_SO, INPUT); 
 
   pinMode(ZERO_CROSS_PIN, INPUT_PULLUP);
   pinMode(HANDLE_SWITCH_PIN, INPUT_PULLUP);
@@ -70,7 +77,7 @@ void hardwareInit() {
   pinMode(ENC_CLK, INPUT_PULLUP);
 
   previousEncoderAB = (digitalRead(ENC_CLK) << 1) | digitalRead(ENC_DT);
-
+  
   attachInterrupt(digitalPinToInterrupt(ZERO_CROSS_PIN), zeroCrossISR, FALLING);
   cli();
   TCCR2A = _BV(WGM21);
@@ -142,11 +149,14 @@ bool readTemperature() {
   }
   digitalWrite(MAX_CS, HIGH);
 
-  if (raw & 0x0004) { // Thermocouple disconnected
+  if (raw & 0x0004) { 
+    LOG_PRINTLNF("[SENSOR ERROR] MAX6675 bit 2 HIGH - Thermocouple Open/Disconnected!");
     currentTempC = NAN; sensorOK = false; return false;
   }
   float t = (float)((raw >> 3) & 0x0FFF) * 0.25f;
-  if (!isfinite(t) || t < 5.0f || t > 1024.0f) {
+  if (!isfinite(t) || t < 1.0f || t > 1024.0f) {
+    LOG_PRINTF("[SENSOR ERROR] Invalid temp range reading: ");
+    LOG_PRINTLN(t);
     currentTempC = NAN; sensorOK = false; return false;
   }
   currentTempC = t; sensorOK = true; return true;
@@ -168,17 +178,18 @@ void updateEncoder() {
     lastEncoderMoveMs = now; lastActivity = now;
 
     int step = 1;
-    if (interval < 50) step = 10;
-    else if (interval < 100) step = 5;
+    if (interval < 50) step = 10;       
+    else if (interval < 100) step = 5;  
 
     switch (uiState) {
       case UI_SET_TEMP:
-        if (step > 1) {
+        if (step > 1) { 
           targetTempC = (direction > 0) ? ((targetTempC / step) + 1) * step : ((targetTempC / step) - 1) * step;
         } else {
           targetTempC += direction;
         }
         targetTempC = constrain(targetTempC, MIN_TEMP_C, MAX_TEMP_C);
+        LOG_PRINTF("[INPUT] Target Temp Changed: "); LOG_PRINTLN(targetTempC);
         lcdNeedsRefresh = true;
         break;
       case UI_SET_FAN:
@@ -188,10 +199,12 @@ void updateEncoder() {
           fanPercent += direction;
         }
         fanPercent = constrain(fanPercent, MIN_FAN_PERCENT, MAX_FAN_PERCENT);
+        LOG_PRINTF("[INPUT] Fan Percent Changed: "); LOG_PRINTLN(fanPercent);
         lcdNeedsRefresh = true;
         break;
       case UI_CONFIRM:
         confirmYes = !confirmYes;
+        LOG_PRINTF("[INPUT] Confirm Option Changed: "); LOG_PRINTLN(confirmYes ? "YES" : "NO");
         lcdNeedsRefresh = true;
         break;
       default: break;
@@ -209,6 +222,7 @@ void updateButton() {
   }
   if (buttonPressedEvent) {
     buttonPressedEvent = false;
-    onEncoderButton();
+    LOG_PRINTLNF("[INPUT] Encoder Button Pressed!");
+    onEncoderButton(); 
   }
 }

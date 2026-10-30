@@ -3,6 +3,23 @@
 
 #include <Arduino.h>
 
+// --- DEBUG LOGGING SWITCH ---
+#define DEBUG_ENABLE 1  // Set 1 untuk Aktifkan Serial Debug, 0 untuk Matikan
+
+#if DEBUG_ENABLE
+  #define LOG_INIT(baud)       Serial.begin(baud)
+  #define LOG_PRINT(x)         Serial.print(x)
+  #define LOG_PRINTLN(x)       Serial.println(x)
+  #define LOG_PRINTF(str)      Serial.print(F(str))
+  #define LOG_PRINTLNF(str)    Serial.println(F(str))
+#else
+  #define LOG_INIT(baud)
+  #define LOG_PRINT(x)
+  #define LOG_PRINTLN(x)
+  #define LOG_PRINTF(str)
+  #define LOG_PRINTLNF(str)
+#endif      
+
 // --- PIN MAP ---
 const uint8_t BUZZER_PIN        = 6;
 const uint8_t TRIAC_PIN         = 7;
