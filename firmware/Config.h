@@ -29,11 +29,18 @@ const float READY_BAND_C = 5.0;
 const unsigned long BACKLIGHT_TIMEOUT_MS = 60000;
 const unsigned long READY_STABLE_MS = 2000;
 
+// --- PID TUNING PARAMETERS ---
+const float HEATER_KP = 2.5f;           // Proportional gain
+const float HEATER_KI = 0.2f;           // Integral gain (provides 15-25% hold power)
+const float HEATER_KD = 1.0f;           // Derivative gain
+const float PID_INTEGRAL_MAX = 200.0f;  // Anti-windup integral clamp limit
+const float PID_ACTIVE_BAND_C = 30.0f;  // Active integral band limit (+/- 30 C from setpoint)
+
 // --- MACHINE STATE ---
 enum UiState : uint8_t { UI_BOOT, UI_FAULT, UI_SET_TEMP, UI_SET_FAN, UI_CONFIRM, UI_RUN };
 
 // --- GLOBAL VARIABLES (EXTERN) ---
-// Only declared here, initialized in the main file (.ino)
+
 extern UiState uiState;
 extern float currentTempC;
 extern int targetTempC;
@@ -48,4 +55,4 @@ extern bool confirmYes;
 extern bool lcdNeedsRefresh;
 extern unsigned long lastActivity;
 
-#endif
+#endif// Only declared here, initialized in the main file (.ino)

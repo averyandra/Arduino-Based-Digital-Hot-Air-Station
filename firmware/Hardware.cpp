@@ -1,5 +1,5 @@
 #include "Hardware.h"
-#include "UI.h" 
+#include "UI.h"
 #include <avr/interrupt.h>
 
 // --- LOCAL HARDWARE VARIABLES ---
@@ -26,7 +26,7 @@ static bool buttonPressedEvent = false;
 
 // --- INTERRUPT SERVICE ROUTINES (ISR) ---
 void zeroCrossISR() {
-  PORTD &= ~_BV(PD7); 
+  PORTD &= ~_BV(PD7);
   zcTicks = 0;
   gateTicksRemaining = 0;
   triacFiredThisHalfCycle = false;
@@ -48,7 +48,7 @@ ISR(TIMER2_COMPA_vect) {
   if (zcTicks < 100) zcTicks++;
   if (!triacFiredThisHalfCycle && zcTicks >= triacDelayTicks) {
     PORTD |= _BV(PD7);
-    gateTicksRemaining = 1; // Gate pulse
+    gateTicksRemaining = 1; // Gate pulse duration
     triacFiredThisHalfCycle = true;
   }
 }
@@ -61,8 +61,7 @@ void hardwareInit() {
 
   pinMode(MAX_CS, OUTPUT); digitalWrite(MAX_CS, HIGH);
   pinMode(MAX_SCK, OUTPUT); digitalWrite(MAX_SCK, LOW);
-  
-  pinMode(MAX_SO, INPUT);
+  pinMode(MAX_SO, INPUT_PULLUP);
 
   pinMode(ZERO_CROSS_PIN, INPUT_PULLUP);
   pinMode(HANDLE_SWITCH_PIN, INPUT_PULLUP);
@@ -71,8 +70,7 @@ void hardwareInit() {
   pinMode(ENC_CLK, INPUT_PULLUP);
 
   previousEncoderAB = (digitalRead(ENC_CLK) << 1) | digitalRead(ENC_DT);
-  
-  // Setup Interrupt
+
   attachInterrupt(digitalPinToInterrupt(ZERO_CROSS_PIN), zeroCrossISR, FALLING);
   cli();
   TCCR2A = _BV(WGM21);
@@ -144,7 +142,7 @@ bool readTemperature() {
   }
   digitalWrite(MAX_CS, HIGH);
 
-  if (raw & 0x0004) { // Sensor disconnected
+  if (raw & 0x0004) { // Thermocouple disconnected
     currentTempC = NAN; sensorOK = false; return false;
   }
   float t = (float)((raw >> 3) & 0x0FFF) * 0.25f;
@@ -170,12 +168,12 @@ void updateEncoder() {
     lastEncoderMoveMs = now; lastActivity = now;
 
     int step = 1;
-    if (interval < 50) step = 10;       
-    else if (interval < 100) step = 5;  
+    if (interval < 50) step = 10;
+    else if (interval < 100) step = 5;
 
     switch (uiState) {
       case UI_SET_TEMP:
-        if (step > 1) { 
+        if (step > 1) {
           targetTempC = (direction > 0) ? ((targetTempC / step) + 1) * step : ((targetTempC / step) - 1) * step;
         } else {
           targetTempC += direction;
@@ -211,6 +209,6 @@ void updateButton() {
   }
   if (buttonPressedEvent) {
     buttonPressedEvent = false;
-    onEncoderButton(); // Call function in UI.cpp
+    onEncoderButton();
   }
 }

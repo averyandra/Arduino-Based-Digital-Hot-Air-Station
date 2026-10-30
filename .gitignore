@@ -3,3 +3,16 @@ build/
 *.elf
 *.eep
 *.bin
+
+# KiCad temporary & local files
+*.kicad_prl
+*-backups/
+*.kicad_sch-bak
+*.kicad_pcb-bak
+_autosave-*
+*.lck
+*.lock
+
+# Optional output folders
+# /plots/
+# /gerber/

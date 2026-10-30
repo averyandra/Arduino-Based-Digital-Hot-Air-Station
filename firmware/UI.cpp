@@ -1,8 +1,5 @@
-
-// The text on the display is in Indonesian.
-
 #include "UI.h"
-#include "Hardware.h" 
+#include "Hardware.h"
 #include <LiquidCrystal_I2C.h>
 
 LiquidCrystal_I2C lcd(LCD_ADDRESS, 16, 2);
@@ -26,7 +23,7 @@ void enterFault() {
   heaterOff();
   sensorOK = false;
   uiState = UI_FAULT;
-  if(!backlightOn) { lcd.backlight(); backlightOn = true; }
+  if (!backlightOn) { lcd.backlight(); backlightOn = true; }
   queueBeep(3);
   lcdNeedsRefresh = true;
 }
@@ -40,16 +37,16 @@ void enterRunMode() {
 
 void onEncoderButton() {
   lastActivity = millis();
-  
-  if (!backlightOn) { // Wake up from dimmed screen
-    lcd.backlight(); backlightOn = true; lcdNeedsRefresh = true; return; 
+
+  if (!backlightOn) {
+    lcd.backlight(); backlightOn = true; lcdNeedsRefresh = true; return;
   }
 
   switch (uiState) {
-    case UI_RUN:      
+    case UI_RUN:
       savedTargetTempC = targetTempC;
       savedFanPercent = fanPercent;
-      uiState = UI_SET_TEMP; 
+      uiState = UI_SET_TEMP;
       break;
     case UI_SET_TEMP: uiState = UI_SET_FAN; break;
     case UI_SET_FAN:  uiState = UI_CONFIRM; confirmYes = true; break;
@@ -58,7 +55,7 @@ void onEncoderButton() {
         savedTargetTempC = targetTempC;
         savedFanPercent = fanPercent;
       } else {
-        targetTempC = savedTargetTempC; // Cancel, rollback values
+        targetTempC = savedTargetTempC;
         fanPercent = savedFanPercent;
       }
       enterRunMode();
@@ -69,20 +66,20 @@ void onEncoderButton() {
 }
 
 void refreshLCD() {
-  // ---- display bugfix
   static bool currentLcdState = true;
   if (backlightOn != currentLcdState) {
-    if (backlightOn) lcd.backlight();
-    else {
+    if (backlightOn) {
+      lcd.backlight();
+    } else {
       lcd.noBacklight();
-      // lcd.clear(); // Optional: clear text when the screen is off
+      lcd.clear();
     }
     currentLcdState = backlightOn;
   }
-  
-  if (!backlightOn) return;
-  char line1[17], line2[17];
 
+  if (!backlightOn) return;
+
+  char line1[17], line2[17];
   switch (uiState) {
     case UI_BOOT:
       lcdPrintPadded(0, 0, "Shinonome-VORSA");
@@ -92,18 +89,18 @@ void refreshLCD() {
       lcdPrintPadded(0, 0, "MALFUNCTION!!");
       lcdPrintPadded(0, 1, "TERCABUT/RUSAK");
       break;
-    case UI_SET_TEMP: 
+    case UI_SET_TEMP:
       lcdPrintPadded(0, 0, "SET TEMPERATURE");
       snprintf(line2, sizeof(line2), "Target: %d C", targetTempC);
       lcdPrintPadded(0, 1, line2);
       break;
-    case UI_SET_FAN: 
+    case UI_SET_FAN:
       lcdPrintPadded(0, 0, "SET AIR FLOW");
       snprintf(line2, sizeof(line2), "Fan: %d%%", fanPercent);
       lcdPrintPadded(0, 1, line2);
       break;
     case UI_CONFIRM:
-      lcdPrintPadded(0, 0, "APAKAH YAKIN?"); 
+      lcdPrintPadded(0, 0, "APAKAH YAKIN?");
       lcdPrintPadded(0, 1, confirmYes ? ">YES       NO" : " YES      >NO");
       break;
     case UI_RUN:
@@ -112,7 +109,7 @@ void refreshLCD() {
       if (sleeping) {
         statusTxt = "SLEEP";
       } else {
-        statusTxt = "HEAT "; 
+        statusTxt = "HEAT ";
         if (heaterDemand == 0 && currentTempC >= targetTempC - READY_BAND_C) statusTxt = "READY";
         if (heaterDemand == 0 && currentTempC < targetTempC - READY_BAND_C) statusTxt = "IDLE ";
       }
