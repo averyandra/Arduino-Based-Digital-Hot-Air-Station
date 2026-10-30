@@ -25,6 +25,10 @@ unsigned long lastUiRefresh = 0;
 unsigned long readySince = 0;
 bool readyBeeped = false;
 
+// UI Refresh Interval Adaptive
+// // 200ms if backlight on, 1000ms (1 second) if backlight off
+unsigned long currentUiInterval = backlightOn ? 200 : 1000;
+
 // PID Controller State Variables
 static float pidIntegral = 0.0f;
 static float pidLastError = 0.0f;
@@ -162,13 +166,13 @@ void loop() {
   }
 
   // UI Refresh Interval (200ms)
-  if (now - lastUiRefresh >= 200) {
+  if (now - lastUiRefresh >= currentUiInterval) {
     lastUiRefresh = now;
     if (lcdNeedsRefresh) {
       refreshLCD();
       lcdNeedsRefresh = false;
-    } else if (uiState == UI_RUN /* && backlightOn */ ) { // comment the backlightOn logic for always refresh when backlight is off
-      refreshLCD();
+    } else if (uiState == UI_RUN) {
+      refreshLCD(); 
     }
   }
 }
