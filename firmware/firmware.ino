@@ -25,10 +25,19 @@ unsigned long lastUiRefresh = 0;
 unsigned long readySince = 0;
 bool readyBeeped = false;
 
+// PID Controller State Variables
+static float pidIntegral = 0.0f;
+static float pidLastError = 0.0f;
+
+void resetPID() {
+  pidIntegral = 0.0f;
+  pidLastError = 0.0f;
+}
+
 void setup() {
   hardwareInit();
   uiInit();
-  
+
   bootStarted = millis();
   lastActivity = millis();
 }
@@ -36,46 +45,66 @@ void setup() {
 void updateSystemLogic() {
   // 1. Backlight Timeout
   if (uiState != UI_FAULT && backlightOn && (millis() - lastActivity >= BACKLIGHT_TIMEOUT_MS)) {
-    // lcd.noBacklight() handled via bypass to state variable
-    backlightOn = false; 
+    backlightOn = false;
     lcdNeedsRefresh = true;
   }
 
   if (uiState != UI_RUN) return;
 
-  // 2. Sleep State (Tilt Sensor)
+  // 2. Sleep State (Tilt/Holder Switch)
   bool nowSleeping = handleIsOnHolder();
   if (nowSleeping && !sleeping) {
     sleeping = true;
     heaterOff();
+    resetPID();
     queueBeep(1);
     lcdNeedsRefresh = true;
   } else if (!nowSleeping && sleeping) {
     sleeping = false;
     readySince = 0;
     readyBeeped = false;
+    resetPID();
     lcdNeedsRefresh = true;
   }
 
   // 3. Fan Cooling System
   if (sleeping) {
     heaterOff();
-    if (sensorOK && currentTempC > 100.0f) analogWrite(FAN_PIN, 255); 
-    else analogWrite(FAN_PIN, 0); 
+    resetPID();
+    if (sensorOK && currentTempC > 100.0f) analogWrite(FAN_PIN, 255);
+    else analogWrite(FAN_PIN, 0);
   } else {
     analogWrite(FAN_PIN, map(fanPercent, 0, 100, 0, 255));
   }
 
-  // 4. Heater PID Control
-  if (!sensorOK || sleeping) {
+  // 4. Heater PID Control (Full PID Implementation)
+  bool zcHealthy = (lastZeroCrossMicros != 0UL) && ((micros() - lastZeroCrossMicros) < 30000UL);
+  if (!sensorOK || sleeping || !zcHealthy) {
     heaterOff();
+    resetPID();
   } else {
     float error = (float)targetTempC - currentTempC;
-    if (error <= 0.5f) {
-      setHeaterDemand(0);
+
+    // Anti-windup: Accumulate integral term only within active temperature window (+/- 30 C)
+    if (fabs(error) <= PID_ACTIVE_BAND_C) {
+      // Temperature polling interval dt = 0.25 seconds
+      pidIntegral += error * 0.25f;
+      pidIntegral = constrain(pidIntegral, 0.0f, PID_INTEGRAL_MAX);
     } else {
-      setHeaterDemand(constrain((int)(error * 2.0f), 0, 100)); // KP Constant = 2.0
+      pidIntegral = 0.0f; // Reset integral term outside active band
     }
+
+    float derivative = (error - pidLastError) / 0.25f;
+    pidLastError = error;
+
+    float pTerm = HEATER_KP * error;
+    float iTerm = HEATER_KI * pidIntegral;
+    float dTerm = HEATER_KD * derivative;
+
+    float output = pTerm + iTerm + dTerm;
+    int demand = constrain((int)output, 0, 100);
+
+    setHeaterDemand(demand);
   }
 
   // 5. Ready Status & Beep
@@ -86,13 +115,13 @@ void updateSystemLogic() {
       if (!readyBeeped && (millis() - readySince >= READY_STABLE_MS)) {
         readyBeeped = true;
         queueBeep(1);
-        lcdNeedsRefresh = true; 
+        lcdNeedsRefresh = true;
       }
     } else {
       readySince = 0;
       if (readyBeeped) {
-        readyBeeped = false; 
-        lcdNeedsRefresh = true; 
+        readyBeeped = false;
+        lcdNeedsRefresh = true;
       }
     }
   }
@@ -105,30 +134,28 @@ void loop() {
   updateButton();
   updateBuzzer();
 
-  // Temperature Polling Interval (250ms) - Used for Boot and Run
-  if (uiState != UI_FAULT && (now - lastTempRead >= 250)) {
-    lastTempRead = now;
-
-    if (uiState == UI_BOOT) {
-      // Start checking the temperature after 3 seconds
-      if (now - bootStarted >= 3000) {
-        if (readTemperature()) {
-          queueBeep(1);
-          enterRunMode();
-        } else if (now - bootStarted >= 4500) {
-          // If failures persist for up to 4.5 seconds, then execute FAULT.
-          enterFault(); 
-        }
+  // 3-Second Booting Phase
+  if (uiState == UI_BOOT) {
+    if (now - bootStarted >= 3000) {
+      if (readTemperature()) {
+        queueBeep(1);
+        enterRunMode();
+      } else {
+        enterFault();
       }
-    } else {
-      // During normal RUN mode, monitor continuously
-      if (!readTemperature()) enterFault();
     }
+  }
+
+  // Temperature Polling Interval (250ms)
+  if (uiState != UI_BOOT && uiState != UI_FAULT && (now - lastTempRead >= 250)) {
+    lastTempRead = now;
+    if (!readTemperature()) enterFault();
   }
 
   // System State Handler
   if (uiState == UI_FAULT) {
     heaterOff();
+    resetPID();
     analogWrite(FAN_PIN, 0);
   } else {
     updateSystemLogic();
@@ -141,7 +168,7 @@ void loop() {
       refreshLCD();
       lcdNeedsRefresh = false;
     } else if (uiState == UI_RUN && backlightOn) {
-      refreshLCD(); 
+      refreshLCD();
     }
   }
 }
