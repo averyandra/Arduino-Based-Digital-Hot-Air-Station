@@ -53,6 +53,9 @@ The codebase is divided into the following modules to prevent logic tangling:
 
 ## Changelog / Recent Updates
 
-### Bug Fixes & Improvements
-* **Display Power Management (`UI.cpp`)**: Fixed a bug where the LCD backlight would remain on indefinitely. The `refreshLCD()` function now correctly issues hardware-level commands to turn off the I2C LCD backlight after the configured 60-second inactivity timeout.
-* **Failsafe Disconnect Detection (`Hardware.cpp`)**: Improved the MAX6675 thermocouple reading logic. The `MAX_SO` pin now utilizes the internal pull-up resistor (`INPUT_PULLUP`), and a strict `< 5.0°C` threshold was added to `readTemperature()`. This ensures the system immediately enters the **MALFUNCTION** state and cuts off the heater if the 858D handle is completely detached or if the connection lines fail.
+### Features & Improvements
+- **Full PID Heater Control (`firmware.ino` & `Config.h`)**: Upgraded the heater control algorithm from a basic Proportional-only scheme to a full **PID (Proportional-Integral-Derivative)** control loop.
+
+  * **Smooth Temperature Stabilization**: Removed the rigid 0% power cutoff at error ≤ 0.5°C, allowing the controller to continuously calculate and supply holding power (15–25%) against blower airflow.
+  * **Anti-Windup Protection**: Integral accumulation operates strictly within a ±30°C active band (`PID_ACTIVE_BAND_C`) and is capped at `PID_INTEGRAL_MAX` to prevent severe overshoot during initial heating.
+  * **State Synchronization**: Added `resetPID()` to clear accumulated integral memory whenever the system transitions to Sleep mode, triggers a Fault state, or turns off the heater.
