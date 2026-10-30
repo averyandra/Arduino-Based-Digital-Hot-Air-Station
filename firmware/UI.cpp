@@ -77,7 +77,7 @@ void refreshLCD() {
     currentLcdState = backlightOn;
   }
 
-  if (!backlightOn) return;
+  // if (!backlightOn) return; // if uncomment, the text will freeze when the backlight is off
 
   char line1[17], line2[17];
   switch (uiState) {
