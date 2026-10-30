@@ -119,10 +119,10 @@ void updateSystemLogic() {
       }
     } else {
       readySince = 0;
-      if (readyBeeped) {
-        readyBeeped = false;
-        lcdNeedsRefresh = true;
-      }
+      // if (readyBeeped) {
+      //   readyBeeped = false;
+      //   lcdNeedsRefresh = true;
+      // }
     }
   }
 }
