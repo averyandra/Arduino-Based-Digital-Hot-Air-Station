@@ -1,5 +1,6 @@
 #ifndef HARDWARE_H
 #define HARDWARE_H
+
 #include "Config.h"
 
 void hardwareInit();
