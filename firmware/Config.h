@@ -22,6 +22,7 @@ const int MAX_TEMP_C = 500;
 const int MIN_FAN_PERCENT = 20;
 const int MAX_FAN_PERCENT = 100;
 const float READY_BAND_C = 5.0f;
+const float READY_HYSTERESIS_C = 20.0f; // Drop required to re-arm the beep
 const uint32_t BACKLIGHT_TIMEOUT_MS = 60000;
 const uint32_t READY_STABLE_MS = 2000;
 

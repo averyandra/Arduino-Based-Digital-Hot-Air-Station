@@ -23,14 +23,19 @@ uint32_t bootStarted = 0;
 uint32_t lastTempRead = 0;
 uint32_t lastUiRefresh = 0;
 uint32_t readySince = 0;
+
+// Hysteresis tracking variables
 bool readyBeeped = false;
+int lastBeepTargetTempC = 350; 
 
 static float pidIntegral = 0.0f;
-static float pidLastError = 0.0f;
+static float pidLastTemp = 0.0f;
+static uint32_t lastPidTime = 0;
 
 void resetPID() {
   pidIntegral = 0.0f;
-  pidLastError = 0.0f;
+  pidLastTemp = currentTempC;
+  lastPidTime = millis();
 }
 
 void updateSystemLogic() {
@@ -69,27 +74,50 @@ void updateSystemLogic() {
   }
 
   bool zcHealthy = (lastZeroCrossMicros != 0UL) && ((micros() - lastZeroCrossMicros) < 30000UL);
+  
   if (!sensorOK || sleeping || !zcHealthy) {
     heaterOff();
     resetPID();
   } else {
-    float error = (float)targetTempC - currentTempC;
-    if (fabs(error) <= PID_ACTIVE_BAND_C) {
-      pidIntegral += error * 0.25f;
-      pidIntegral = (pidIntegral < 0.0f) ? 0.0f : ((pidIntegral > PID_INTEGRAL_MAX) ? PID_INTEGRAL_MAX : pidIntegral);
-    } else {
-      pidIntegral = 0.0f;
-    }
-    float derivative = (error - pidLastError) / 0.25f;
-    pidLastError = error;
+    // PID Computation - Gated strictly to 250ms to prevent integral windup 
+    if (now - lastPidTime >= 250) {
+      float dt = (float)(now - lastPidTime) / 1000.0f;
+      lastPidTime = now;
 
-    float output = (HEATER_KP * error) + (HEATER_KI * pidIntegral) + (HEATER_KD * derivative);
-    int demand = (output < 0.0f) ? 0 : ((output > 100.0f) ? 100 : (int)output);
-    setHeaterDemand(demand);
+      float error = (float)targetTempC - currentTempC;
+      
+      // Calculate integral with active band to avoid deep saturation
+      if (fabs(error) <= PID_ACTIVE_BAND_C) {
+        pidIntegral += HEATER_KI * error * dt;
+        if (pidIntegral < 0.0f) pidIntegral = 0.0f;
+        else if (pidIntegral > PID_INTEGRAL_MAX) pidIntegral = PID_INTEGRAL_MAX;
+      } else {
+        pidIntegral = 0.0f;
+      }
+
+      // Derivative on Measurement (prevents derivative kick on setpoint change)
+      float derivative = -HEATER_KD * (currentTempC - pidLastTemp) / dt;
+      pidLastTemp = currentTempC;
+
+      float pTerm = HEATER_KP * error;
+      float output = pTerm + pidIntegral + derivative;
+      
+      int demand = (output < 0.0f) ? 0 : ((output > 100.0f) ? 100 : (int)output);
+      setHeaterDemand(demand);
+    }
+  }
+
+  // Ready Beep Logic with Hysteresis
+  if (targetTempC != lastBeepTargetTempC) {
+    lastBeepTargetTempC = targetTempC;
+    readyBeeped = false; // Reset beep if user changes the target
+    readySince = 0;
   }
 
   if (!sleeping && sensorOK) {
-    bool inBand = fabs(currentTempC - (float)targetTempC) <= READY_BAND_C;
+    float tempError = (float)targetTempC - currentTempC;
+    bool inBand = fabs(tempError) <= READY_BAND_C;
+    
     if (inBand) {
       if (readySince == 0) readySince = now;
       if (!readyBeeped && (now - readySince >= READY_STABLE_MS)) {
@@ -99,6 +127,11 @@ void updateSystemLogic() {
       }
     } else {
       readySince = 0;
+      // Only reset the ready beep flag if the temp drops significantly below the target
+      // This stops the repeated beeping if it oscillates a few degrees below the band.
+      if (tempError > READY_HYSTERESIS_C) {
+        readyBeeped = false;
+      }
     }
   }
 }
@@ -109,6 +142,7 @@ int main(void) {
 
   bootStarted = millis();
   lastActivity = millis();
+  lastPidTime = millis();
 
   // Infinite Loop
   while (1) {

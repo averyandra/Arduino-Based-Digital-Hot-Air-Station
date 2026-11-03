@@ -59,7 +59,7 @@ uint32_t micros() {
 
 // --- BARE-METAL EEPROM HANDLER ---
 void eeprom_write_byte_bare(uint16_t addr, uint8_t data) {
-  while (EECR & (1 << EEPE)); // Wait for completion of previous write
+  while (EECR & (1 << EEPE));
   EEAR = addr;
   EEDR = data;
   EECR |= (1 << EEMPE);
@@ -100,8 +100,8 @@ void loadSettingsFromEEPROM() {
 }
 
 // --- INTERRUPTS (ZERO CROSS & TRIAC TIMER2) ---
-ISR(INT0_vect) { // Zero Cross Pin PD2
-  PORTD &= ~(1 << PD7); // Pulse TRIAC LOW
+ISR(INT0_vect) {
+  PORTD &= ~(1 << PD7);
   zcTicks = 0;
   gateTicksRemaining = 0;
   triacFiredThisHalfCycle = false;
@@ -122,7 +122,7 @@ ISR(TIMER2_COMPA_vect) {
   }
   if (zcTicks < 100) zcTicks++;
   if (!triacFiredThisHalfCycle && zcTicks >= triacDelayTicks) {
-    PORTD |= (1 << PD7); // Pulse TRIAC HIGH
+    PORTD |= (1 << PD7);
     gateTicksRemaining = 1;
     triacFiredThisHalfCycle = true;
   }
@@ -133,38 +133,39 @@ void hardwareInit() {
   cli();
 
   // GPIO Direction setup
-  DDRD |= (1 << DDD6) | (1 << DDD7);                           // Buzzer (PD6), Triac (PD7) OUTPUT
-  DDRD &= ~((1 << DDD2) | (1 << DDD3) | (1 << DDD4) | (1 << DDD5)); // Inputs: ZC, SW, DT, CLK
-  PORTD |= (1 << PORTD2) | (1 << PORTD3) | (1 << PORTD4) | (1 << PORTD5); // Pull-ups
+  DDRD |= (1 << DDD6) | (1 << DDD7);
+  DDRD &= ~((1 << DDD2) | (1 << DDD3) | (1 << DDD4) | (1 << DDD5));
+  PORTD |= (1 << PORTD2) | (1 << PORTD3) | (1 << PORTD4) | (1 << PORTD5);
 
-  DDRB |= (1 << DDB1) | (1 << DDB2) | (1 << DDB5);              // Fan PWM (PB1), MAX CS (PB2), SCK (PB5) OUTPUT
-  DDRB &= ~(1 << DDB0) | (1 << DDB4);                           // Handle SW (PB0), MAX SO (PB4) INPUT
-  PORTB |= (1 << PORTB0) | (1 << PORTB4) | (1 << PORTB2);       // Pull-ups + MAX CS High
+  DDRB |= (1 << DDB1) | (1 << DDB2) | (1 << DDB5);
+  DDRB &= ~(1 << DDB0) | (1 << DDB4);
+  PORTB |= (1 << PORTB0) | (1 << PORTB4) | (1 << PORTB2);
 
-  // Hardware PWM Timer1 (Fan Control on PB1 / Pin 9)
-  TCCR1A = (1 << COM1A1) | (1 << WGM10); // Non-inverting Fast PWM 8-bit
-  TCCR1B = (1 << WGM12) | (1 << CS11) | (1 << CS10); // Prescaler 64 (~976Hz)
+  // Hardware PWM Timer1 (Fan Control on PB1 / Pin 9) - 30kHz
+  // Fast PWM Mode 14, Non-inverting, TOP = ICR1
+  TCCR1A = (1 << COM1A1) | (1 << WGM11);
+  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10); // Prescaler 1 (16MHz)
+  ICR1 = 532; // F_PWM = 16MHz / (1 * (532 + 1)) = 30018 Hz ~30kHz
   OCR1A = 0;
 
   // Hardware SPI Master Mode (MAX6675)
-  SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR0); // Enable SPI, Master, F_CPU/16 (1MHz)
+  SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR0);
 
   // Hardware TWI/I2C (LCD 100kHz)
-  TWSR = 0x00; // Prescaler = 1
-  TWBR = 0x48; // SCL frequency = 100kHz @ 16MHz F_CPU
+  TWSR = 0x00;
+  TWBR = 0x48;
 
-  // SysTick Timer0 Setup
   timer0_init();
 
   // External Interrupt INT0 (Zero-Cross Falling Edge on PD2)
-  EICRA = (1 << ISC01); // Falling Edge
-  EIMSK = (1 << INT0);  // Enable INT0
+  EICRA = (1 << ISC01);
+  EIMSK = (1 << INT0);
 
   // Timer2 Setup (Triac Phase Timing)
-  TCCR2A = (1 << WGM21); // CTC Mode
-  TCCR2B = (1 << CS21);  // Prescaler 8 (1 tick = 0.5us)
+  TCCR2A = (1 << WGM21);
+  TCCR2B = (1 << CS21);
   TCNT2 = 0;
-  OCR2A = 199;           // Interrupt every 100us
+  OCR2A = 199;
   TIMSK2 |= (1 << OCIE2A);
 
   sei();
@@ -174,7 +175,8 @@ void hardwareInit() {
 }
 
 void setFanPWM(uint8_t duty8bit) {
-  OCR1A = duty8bit;
+  // Map 0-255 to 0-532 for Timer1 TOP value matching
+  OCR1A = (uint16_t)duty8bit * 532 / 255;
 }
 
 void heaterOff() {
@@ -211,13 +213,13 @@ void updateBuzzer() {
   uint32_t now = millis();
   if (buzzerOn) {
     if (now - buzzerChangedAt >= BEEP_ON_MS) {
-      PORTD &= ~(1 << PD6); // Buzzer LOW
+      PORTD &= ~(1 << PD6);
       buzzerOn = false;
       buzzerChangedAt = now;
       if (beepRemaining > 0) beepRemaining--;
     }
   } else if (beepRemaining > 0 && now - buzzerChangedAt >= BEEP_OFF_MS) {
-    PORTD |= (1 << PD6);  // Buzzer HIGH
+    PORTD |= (1 << PD6);
     buzzerOn = true;
     buzzerChangedAt = now;
   }
@@ -240,7 +242,7 @@ bool readTemperature() {
 
   uint16_t raw = (h << 8) | l;
 
-  if (raw & 0x0004) { // Open Thermocouple Fault
+  if (raw & 0x0004) {
     currentTempC = NAN; sensorOK = false; return false;
   }
   float t = (float)((raw >> 3) & 0x0FFF) * 0.25f;

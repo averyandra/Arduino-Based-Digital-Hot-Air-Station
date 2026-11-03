@@ -136,7 +136,7 @@ void onEncoderButton() {
       if (confirmYes) {
         savedTargetTempC = targetTempC;
         savedFanPercent = fanPercent;
-        saveSettingsToEEPROM(); // EEPROM Auto-Save on Confirmation!
+        saveSettingsToEEPROM(); 
       } else {
         targetTempC = savedTargetTempC;
         fanPercent = savedFanPercent;
@@ -191,7 +191,6 @@ void refreshLCD() {
       lcdPrintPadded_P(0, 1, confirmYes ? str_yes_no : str_no_yes);
       break;
     case UI_RUN:
-      // Line 1: "T:350C SP:350"
       lineBuf[0]='T'; lineBuf[1]=':';
       format_num3(&lineBuf[2], isnan(currentTempC) ? 0 : (int)currentTempC);
       lineBuf[5]='C'; lineBuf[6]=' '; lineBuf[7]='S'; lineBuf[8]='P'; lineBuf[9]=':';
@@ -199,7 +198,6 @@ void refreshLCD() {
       lineBuf[13]='\0';
       lcdPrintPadded_RAM(0, 0, lineBuf);
 
-      // Line 2: "F: 50% S:HEAT "
       lineBuf[0]='F'; lineBuf[1]=':';
       format_num3(&lineBuf[2], fanPercent);
       lineBuf[5]='%'; lineBuf[6]=' '; lineBuf[7]='S'; lineBuf[8]=':';
